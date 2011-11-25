@@ -1,0 +1,7 @@
+# gevent - A coroutine-based network library for Python
+gevent>=0.13.6
+
+# The psycopg2 module is provides PostgreSQL connectivity and supports
+# coroutine based async access
+psycopg2>=2.4.2
+
