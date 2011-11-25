@@ -17,7 +17,7 @@ from gevent import monkey; monkey.patch_all()
 
 import psycopg2
 
-# from psyco_ge import make_psycopg_green; make_psycopg_green()
+from psyco_ge import make_psycopg_green; make_psycopg_green()
 from gevent.select import select
 
 

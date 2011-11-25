@@ -19,8 +19,8 @@ import logging
 from gevent.select import select
 from gevent.queue import Queue
 from gevent.queue import Empty as QueueEmptyException
-from gDBPoolError import DBInteractionException, DBPoolConnectionException, PoolConnectionException, StreamEndException
-from gDBPool import DBInteractionPool, DBConnectionPool, PoolConnection
+from gDBPool.gDBPoolError import DBInteractionException, DBPoolConnectionException, PoolConnectionException, StreamEndException
+from gDBPool.gDBPool import DBInteractionPool, DBConnectionPool, PoolConnection
 
 logging.basicConfig( level = logging.INFO, format = "%(asctime)s %(message)s" )
 logger = logging.getLogger()
@@ -38,20 +38,20 @@ class gDBPoolTests( unittest.TestCase ):
         del( self.ipool )
         # del( self.ipool_read )
 
-    def _test_connect_nonexisting_host_port( self ):
+    def test_connect_nonexisting_host_port( self ):
         with self.assertRaises( PoolConnectionException ):
             dsn = "host=127.0.0.1 port=6432 user=postgres dbname=gdbpool_test"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
-    def _test_connect_nonexisting_db( self ):
+    def test_connect_nonexisting_db( self ):
         with self.assertRaises( PoolConnectionException ):
             dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test_not_here"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
-    def _test_connect_pool_size_too_big( self ):
+    def test_connect_pool_size_too_big( self ):
         pass
 
-    def _test_invalid_query( self ):
+    def test_invalid_query( self ):
         """ Test running an invalid SQL interactions on the DBInteractionPool
         """
 
@@ -106,7 +106,7 @@ class gDBPoolTests( unittest.TestCase ):
         gevent.joinall( greenlets, timeout = 10 )
 
 
-    def _test_select_ip_interaction( self ):
+    def test_select_ip_interaction( self ):
         def interaction( conn ):
             curs = conn.cursor()
             sql = """
@@ -123,7 +123,7 @@ class gDBPoolTests( unittest.TestCase ):
         # logger.info( res.get() )
 
 
-    def _test_select_ip_interactions( self ):
+    def test_select_ip_interactions( self ):
         def interaction( conn ):
             curs = conn.cursor()
             sql = """
@@ -144,7 +144,7 @@ class gDBPoolTests( unittest.TestCase ):
         gevent.joinall( greenlets, timeout = 10, raise_error = True )
 
 
-    def _test_listen_on( self ):
+    def test_listen_on( self ):
         def run_insert( wait ):
             gevent.sleep( 0.1 )
             sql = """

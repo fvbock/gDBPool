@@ -16,7 +16,7 @@ import psycopg2
 import sys
 
 from psyco_ge import make_psycopg_green; make_psycopg_green()
-assert 'psyco_ge' in sys.modules.keys()
+assert 'gDBPool.psyco_ge' in sys.modules.keys()
 
 from gevent.queue import Queue
 from gevent.queue import Empty as QueueEmptyException
