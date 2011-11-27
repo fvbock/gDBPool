@@ -3,6 +3,7 @@ gDBPool
 
 gDBPool is a connection and interaction pooling library for/based on gevent.
 
+_This is an alpha release... Point guns only in safe directions... ;)_
 
 Although gDBPool _should_ be able to work with all DB-API 2.0 compliant drivers
 (I did not test this), the main db/driver it is written for is Postgres (9.x+ if
@@ -57,6 +58,9 @@ Internally it uses a `PGChannelListener` singleton (per channel) to LISTEN and
 just subscribes the result_queue to it if other queues are already listening
 on that channel.
 
+Like I said - this is an alpha version - so any help testing/breaking things
+and then dropping me a line or even better leaving an issue on github is greatly
+appreciated!
 
 
 # Installation #
