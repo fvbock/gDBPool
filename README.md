@@ -59,8 +59,8 @@ just subscribes the result_queue to it if other queues are already listening
 on that channel.
 
 Like I said - this is an alpha version - so any help testing/breaking things
-and then dropping me a line or even better leaving an issue on github is greatly
-appreciated!
+and then leaving an issue on github is greatly appreciated! Or drop me a line
+(email me or ping me on twitter [@fvbock](https://twitter.com/fvbock)).
 
 
 # Installation #
