@@ -10,6 +10,8 @@ setup(
     version = '0.1.1',
     author = 'Florian von Bock',
     author_email = 'f@vonbock.com',
+    url = 'https://github.com/fvbock/gDBPool',
+    license = 'MIT License',
     packages = ['gDBPool',],
     description = 'Database pooling and interaction/query runner for gevent.',
     long_description = open('README.md').read(),
