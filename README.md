@@ -8,7 +8,7 @@ _This is an alpha release... Point guns only in safe directions... ;)_
 Although gDBPool _should_ be able to work with all DB-API 2.0 compliant drivers
 (I did not test this), the main db/driver it is written for is Postgres (9.x+ if
 you want to use the asynchronous LISTEN/NOTIFY features in a meaningful way.
-Previous versions supported LISTEN/NotifY but no customized payloads...) and
+Previous versions supported LISTEN/NOTIFY but no customized payloads...) and
 psycopg2.
 
 
@@ -16,31 +16,33 @@ gevent 0.13.6 is listed in `requirements.txt` but first tests with gevent 1.0a3
 all worked fine.
 
 
-gDBPool provides provides 2 main classes to work with in applications:
+gDBPool provides  2 main classes to work with in applications:
 
 
 `DBConnectionPool` and `DBInteractionPool`.
 
 
 `DBConnectionPool` is a connection pool with a `get()` and `put()` method to get
-connections from the pool and puting them back.
+connections from the pool and putting them back.
 
 
 Both functions take a timeout (get defaulting to no timeout, put defaulting to a
 timeout of 1 second). Additionally the get function takes an argument
 `auto_commit` to set the transaction isolation level of the connection to
-`ISOLATION_LEVEL_AUTOCOMMIT`. putting the connection back will reset the level to
-the default of `ISOLATION_LEVEL_READ_COMMITTED`. (the levels `read_uncommited`,
-`read_repeatable`, and `serializable` will be added soon - see TODO)
+`ISOLATION_LEVEL_AUTOCOMMIT` if set to True. Putting the connection back will
+reset the level to the default of `ISOLATION_LEVEL_READ_COMMITTED`. (the levels
+`read_uncommited`, `read_repeatable`, and `serializable` will be added soon and
+`auto_commit` most likely be replaced with a `isoaltion_level` argument to the
+method. see TODO...)
 
 
 `DBInteractionPool` manages one or more pools and provides a `run()` method to
 run interactions (plain sql queries passed in or functions that take an
-argument `conn`).
+argument `conn` to get a connection from the pool passed into).
 
 `DBInteractionPool` will run the interactions on either a pool that gets named
 as an argument to the `run()` method or will use a default - depending on
-whether the interactions is marked as a read_only interaction (no side-effects)
+whether the interaction is marked as a read_only interaction (no side-effects)
 or not. As default an interaction with side-effects is assumed (in other words
 a write query).
 
