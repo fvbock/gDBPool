@@ -232,7 +232,7 @@ class DBConnectionPool( object ):
         if isinstance( conn, PoolConnection ):
             if self.CONN_RECYCLE_AFTER != 0 and time() - conn.PoolConnection_initialized_at < self.CONN_RECYCLE_AFTER:
                 try:
-                    if conn.isolation_level == ISOLATION_LEVEL_READ_COMMITTED:
+                    if conn.isolation_level != ISOLATION_LEVEL_READ_COMMITTED:
                         conn.set_isolation_level( ISOLATION_LEVEL_READ_COMMITTED )
                         conn.commit()
                     self.pool.put( conn, timeout = timeout )
