@@ -122,7 +122,7 @@ or a function:
         curs.close()
         return res
 
-    async_res = self.ipool.run( interaction )
+    async_res = ipool.run( interaction )
     res = async_res.get()
 
 `run()` returns a `gevent.event.AsyncResult`.
@@ -134,7 +134,7 @@ how the RULES are set up to have Postgres send events. Check the function/test
 
     rq = gevent.queue.Queue( maxsize = None )
     stop_event = gevent.event.Event()
-    gevent.spawn( self.ipool.listen_on, result_queue = rq,
+    gevent.spawn( ipool.listen_on, result_queue = rq,
                   channel_name = 'notify_test_values',
                   cancel_event = stop_event )
     while 1:
