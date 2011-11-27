@@ -63,11 +63,11 @@ on that channel.
 
 install the required packages:
 
-    `$ pip install -r requirements.txt`
+    $ pip install -r requirements.txt
 
 then install the package itself
 
-    `$ sudo python setup.py install`
+    $ sudo python setup.py install
 
 
 # Examples #
@@ -75,7 +75,6 @@ then install the package itself
 in the `tests` folder is a `test_schema.sql`. load that into a db called `gdbpool_test`
 if you want to run these examples:
 
-    `
     $ psql -U postgres
     psql (9.0.5)
     Type "help" for help.
@@ -92,29 +91,23 @@ if you want to run these examples:
     CREATE RULE
     CREATE RULE
     gdbpool_test=#
-    `
 
 create a `DBInteractionPool` with an internal derfault connection pool that has
 16 connections. Logging is turned on.
 
-    `
     dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test"
     ipool = DBInteractionPool( dsn, pool_size = 16, do_log = True )
-    `
 
 and then run a query on it:
 
-    `
     sql = """
     SELECT val1, count(id) FROM test_values WHERE val2 = %s GROUP BY val1 order by val1;
     """
     async_res = ipool.run( sql )
     res = async_res.get()
-    `
 
 or a function:
 
-    `
     def interaction( conn ):
         curs = conn.cursor()
         sql = """
@@ -127,7 +120,6 @@ or a function:
 
     async_res = self.ipool.run( interaction )
     res = async_res.get()
-    `
 
 `run()` returns a `gevent.event.AsyncResult`.
 
@@ -136,7 +128,6 @@ data from the LISTEN stream. Have a look at the `tests/test_schema.sql` to see
 how the RULES are set up to have Postgres send events. Check the function/test
 `test_listen_on()` in `tests/tests.py` for a more complete example:
 
-    `
     rq = gevent.queue.Queue( maxsize = None )
     stop_event = gevent.event.Event()
     gevent.spawn( self.ipool.listen_on, result_queue = rq,
@@ -154,7 +145,7 @@ how the RULES are set up to have Postgres send events. Check the function/test
             gevent.sleep( 0.01 )
 
     stop_event.set()
-    `
+
 
 
 
