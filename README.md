@@ -56,9 +56,9 @@ to (a `gevent.queue.Queue()`) and a cancel_event (a `gevent.event.Event()`) as
 parameters. When the cancel_event is set the loop listening to events from the
 db breaks and unregisters the result_queue.
 
-Internally it uses a `PGChannelListener` singleton (per channel) to LISTEN and
-just subscribes the result_queue to it if other queues are already listening
-on that channel.
+Internally it uses a `PGChannelListener` singleton (one per channel) to LISTEN
+to notifications from the db and subsequently just subscribes the passed in
+result_queues.
 
 Like I said - this is an alpha version - so any help testing/breaking things
 and then leaving an issue on github is greatly appreciated! Or drop me a line
