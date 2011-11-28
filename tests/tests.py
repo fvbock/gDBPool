@@ -195,7 +195,9 @@ class gDBPoolTests( unittest.TestCase ):
             print "#STOP"
             stop_event.set()
 
-        gevent.spawn( listen )
+        for i in xrange( 10 ):
+            gevent.spawn( listen )
+
         greenlets = []
         for i in xrange( 5 ):
             greenlets.append( gevent.spawn( run_insert, i ) )
