@@ -44,13 +44,14 @@ class PGChannelListener( object ):
     notifications out to the subscribed {Queues}
     """
 
-    def __new__(  cls, q, conn, channel_name, *args, **kwargs ):
+    def __new__(  cls, q, pool, channel_name, *args, **kwargs ):
         if not hasattr( cls, '_instances' ):
             cls._instances = {}
         if not cls._instances.has_key( channel_name ):
             cls._instances[ channel_name ] = object.__new__( cls )
             cls._instances[ channel_name ].subscribers = {}
-            cls._instances[ channel_name ].conn = conn
+            cls._instances[ channel_name ].pool = pool
+            cls._instances[ channel_name ].conn = pool.get( auto_commit = True )
             cls._instances[ channel_name ].channel_name = channel_name
             gevent.spawn( cls._instances[ channel_name ].listen )
 
@@ -71,6 +72,7 @@ class PGChannelListener( object ):
         del self.subscribers[ q_id ]
         if len( self.subscribers ) == 0:
             self.stop_event.set()
+            self.pool.put( self.conn )
 
     def listen( self, unmarshaller = pipe_colon_unmarshall ):
         """ Subscriber to the channel and send notification payloads to the

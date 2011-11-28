@@ -156,9 +156,9 @@ class DBInteractionPool( object ):
             raise DBInteractionException( "This feature requires PostgreSQL 9.x." )
         use_pool = self.default_write_pool if pool is None else pool
         try:
-            conn = self.conn_pools[ use_pool ].get( auto_commit = True )
+            # conn = self.conn_pools[ use_pool ].get( auto_commit = True )
             q = Queue( maxsize = None )
-            listener = PGChannelListener( q, conn, channel_name )
+            listener = PGChannelListener( q, self.conn_pools[ use_pool ], channel_name )
             while 1:
                 if cancel_event.is_set():
                     print "stop event received"
@@ -175,8 +175,7 @@ class DBInteractionPool( object ):
         if self.do_log == True:
             self.logger.info( "stopped listening on: %s", ( channel_name, ) )
         listener.unregister_queue( id( q ) )
-        self.conn_pools[ use_pool ].put( conn )
-        self.logger.info( "done listening" )
+        # self.conn_pools[ use_pool ].put( conn )
 
 
 class DBConnectionPool( object ):
