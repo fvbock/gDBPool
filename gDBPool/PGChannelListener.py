@@ -58,7 +58,6 @@ class PGChannelListener( object ):
         # hai hai... using id for this kind of stuff is sort of dangerous.
         # will come up with something less pointing gun at foot(TM). later. (TM).
         cls._instances[ channel_name ].subscribers[ id( q ) ] = q
-        print cls._instances[ channel_name ].subscribers
         return cls._instances[ channel_name ]
 
     def __init__( self, q, conn, channel_name ):
