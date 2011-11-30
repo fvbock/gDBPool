@@ -23,7 +23,7 @@ from gevent.queue import Empty as QueueEmptyException
 from gevent.pool import Pool as GreenPool
 from gevent.event import AsyncResult
 from time import time
-from types import FunctionType, StringType
+from types import FunctionType, MethodType, StringType
 from gDBPoolError import DBInteractionException, DBPoolConnectionException, PoolConnectionException, StreamEndException
 from PGChannelListener import PGChannelListener
 from psycopg2.extras import RealDictCursor
@@ -106,7 +106,7 @@ class DBInteractionPool( object ):
         else:
             use_pool = self.default_read_pool if pool is None else pool
 
-        if isinstance( interaction, FunctionType ):
+        if isinstance( interaction, FunctionType ) or isinstance( interaction, MethodType ):
             def wrapped_transaction_f( async_res, interaction, *args ):
                 try:
                     conn = self.conn_pools[ use_pool ].get()
@@ -122,7 +122,7 @@ class DBInteractionPool( object ):
             gevent.spawn( wrapped_transaction_f, async_result, interaction, *args )
             return async_result
 
-        if isinstance( interaction, StringType ):
+        elif isinstance( interaction, StringType ):
             def transaction_f( async_res, sql, *args ):
                 try:
                     conn = self.conn_pools[ use_pool ].get()
@@ -149,6 +149,8 @@ class DBInteractionPool( object ):
 
             gevent.spawn( transaction_f, async_result, interaction, *args )
             return async_result
+        else:
+            raise DBInteractionException( "%s cannot be run. run() only accepts FunctionTypes, MethodType, and StringTypes" % interacetion )
 
     def listen_on( self, result_queue = None, channel_name = None, pool = None,
                    timeout = None, cancel_event = None ):
