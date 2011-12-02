@@ -116,8 +116,8 @@ class DBInteractionPool( object ):
                     async_res.set( res )
                 except Exception, e:
                     if self.do_log == True:
-                        self.logger.info( "exception: %s", ( e.message, ) )
-                    async_result.set_exception( DBInteractionException( e.message ) )
+                        self.logger.info( "exception: %s", ( e, ) )
+                    async_result.set_exception( DBInteractionException( e ) )
 
             gevent.spawn( wrapped_transaction_f, async_result, interaction, *args )
             return async_result
@@ -144,8 +144,8 @@ class DBInteractionPool( object ):
                     if is_write:
                         conn.rollback()
                     if self.do_log == True:
-                        self.logger.info( "exception: %s", ( e.message, ) )
-                    async_result.set_exception( DBInteractionException( e.message ) )
+                        self.logger.info( "exception: %s", ( e, ) )
+                    async_result.set_exception( DBInteractionException( e ) )
 
             gevent.spawn( transaction_f, async_result, interaction, *args )
             return async_result
@@ -209,7 +209,7 @@ class DBConnectionPool( object ):
                 self.logger.info( "$ poolsize: %i" % self.pool.qsize() )
             self.ready = True
         except Exception, e:
-            raise PoolConnectionException( e.message )
+            raise PoolConnectionException( e )
 
     def __del__( self ):
         while not self.pool.empty():
@@ -226,7 +226,7 @@ class DBConnectionPool( object ):
                 conn.set_isolation_level( ISOLATION_LEVEL_AUTOCOMMIT )
             return conn
         except gevent.queue.Empty, e:
-            raise PoolConnectionException( e.message )
+            raise PoolConnectionException( e )
 
     def put( self, conn, timeout = 1 ):
         if isinstance( conn, PoolConnection ):
@@ -237,7 +237,7 @@ class DBConnectionPool( object ):
                         conn.commit()
                     self.pool.put( conn, timeout = timeout )
                 except gevent.queue.Full, e:
-                    raise PoolConnectionException( e.message )
+                    raise PoolConnectionException( e )
             else:
                 if self.do_log == True:
                     self.logger.debug( "recycling conn." )
@@ -275,7 +275,7 @@ class PoolConnection( object ):
             self.conn = self.PoolConnection_db_module.connect( dsn )
             self.initialized_at = time()
         except Exception, e:
-            raise PoolConnectionException( e.message )
+            raise PoolConnectionException( e )
 
     def __getattribute__( self, name ):
         if name.startswith( 'PoolConnection_' ) or name == 'cursor':
