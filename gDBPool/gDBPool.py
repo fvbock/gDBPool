@@ -13,13 +13,12 @@ import gevent
 from gevent import monkey; monkey.patch_all()
 
 import psycopg2
-import sys
+import sys, traceback
 
 from psyco_ge import make_psycopg_green; make_psycopg_green()
 assert 'gDBPool.psyco_ge' in sys.modules.keys()
 
-from gevent.queue import Queue
-from gevent.queue import Empty as QueueEmptyException
+from gevent.queue import Queue, Empty as QueueEmptyException
 from gevent.pool import Pool as GreenPool
 from gevent.event import AsyncResult
 from time import time
@@ -30,6 +29,7 @@ from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, ISOLATION_LEVEL_READ_COMMITTED
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODE )
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODEARRAY )
+from psycopg2 import DatabaseError, InterfaceError
 
 # TODO: make this an option...
 # DEC2FLOAT = psycopg2.extensions.new_type(
@@ -74,10 +74,8 @@ class DBInteractionPool( object ):
         for p in self.conn_pools:
             p.__del__()
 
-    # def __call__( self, txn_f ):
-    #     def wrapped_f_call( *args, **kwargs ):
-    #         return self.run( txn_f, *args, **kwargs  )
-    #     return wrapped_f_call
+    def __call__( self, *args, **kwargs ):
+        return self.run( *args, **kwargs  )
 
     def add_pool( self, dsn = None, pool_name = None, pool_size = 10,
                   default_write_pool = False, default_read_pool = False,
@@ -114,6 +112,10 @@ class DBInteractionPool( object ):
                     res = interaction( *args, **kwargs )
                     self.conn_pools[ use_pool ].put( conn )
                     async_res.set( res )
+                except DatabaseError, e:
+                    if self.do_log == True:
+                        self.logger.info( "exception: %s", ( e, ) )
+                    async_result.set_exception( DBInteractionException( e ) )
                 except Exception, e:
                     if self.do_log == True:
                         self.logger.info( "exception: %s", ( e, ) )
@@ -140,7 +142,12 @@ class DBInteractionPool( object ):
                     cur.close()
                     self.conn_pools[ use_pool ].put( conn )
                     async_res.set( res )
+                except DatabaseError, e:
+                    if self.do_log == True:
+                        self.logger.info( "exception: %s", ( e, ) )
+                    async_result.set_exception( DBInteractionException( e ) )
                 except Exception, e:
+                    traceback.print_exc( file = sys.stdout )
                     if is_write:
                         conn.rollback()
                     if self.do_log == True:
@@ -217,7 +224,10 @@ class DBConnectionPool( object ):
             conn.close()
 
     def create_connection( self ):
-        self.pool.put( PoolConnection( self.db_module, self.dsn ) )
+        try:
+            self.pool.put( PoolConnection( self.db_module, self.dsn ) )
+        except PoolConnectionException, e:
+            raise e
 
     def get( self, timeout = None, auto_commit = False ):
         try:
@@ -228,9 +238,9 @@ class DBConnectionPool( object ):
         except gevent.queue.Empty, e:
             raise PoolConnectionException( e )
 
-    def put( self, conn, timeout = 1 ):
+    def put( self, conn, timeout = 1, force_recycle = False ):
         if isinstance( conn, PoolConnection ):
-            if self.CONN_RECYCLE_AFTER != 0 and time() - conn.PoolConnection_initialized_at < self.CONN_RECYCLE_AFTER:
+            if ( self.CONN_RECYCLE_AFTER != 0 and time() - conn.PoolConnection_initialized_at < self.CONN_RECYCLE_AFTER ) and force_recycle == False:
                 try:
                     if conn.isolation_level != ISOLATION_LEVEL_READ_COMMITTED:
                         conn.set_isolation_level( ISOLATION_LEVEL_READ_COMMITTED )
@@ -241,10 +251,12 @@ class DBConnectionPool( object ):
             else:
                 if self.do_log == True:
                     self.logger.debug( "recycling conn." )
-                conn.close()
+                try:
+                    conn.close()
+                except InterfaceError:
+                    pass
                 del conn
-                g = gevent.spawn( self.create_connection )
-                g.join()
+                gevent.spawn( self.create_connection ).join()
         else:
             raise PoolConnectionException( "Passed object %s is not a PoolConnection." % ( conn, ) )
 
@@ -275,7 +287,7 @@ class PoolConnection( object ):
             self.conn = self.PoolConnection_db_module.connect( dsn )
             self.initialized_at = time()
         except Exception, e:
-            raise PoolConnectionException( e )
+            raise PoolConnectionException( "PoolConnection failed: Could not connect to database." )
 
     def __getattribute__( self, name ):
         if name.startswith( 'PoolConnection_' ) or name == 'cursor':
