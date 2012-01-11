@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2011 Florian von Bock (f at vonbock dot info)
+# Copyright 2011-2012 Florian von Bock (f at vonbock dot info)
 #
 # gDBPool - db connection pooling for gevent
 #
@@ -8,7 +8,7 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 import sys, traceback
