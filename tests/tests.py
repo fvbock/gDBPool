@@ -6,11 +6,14 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 import gevent
 from gevent import monkey; monkey.patch_all()
+
+import os, sys
+sys.path.insert( 0, os.path.dirname( __file__ ).rpartition( '/' )[ 0 ] )
 
 import unittest
 import random
@@ -25,18 +28,18 @@ from gDBPool.gDBPool import DBInteractionPool, DBConnectionPool, PoolConnection
 logging.basicConfig( level = logging.INFO, format = "%(asctime)s %(message)s" )
 logger = logging.getLogger()
 
+dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test"
+#dsn_read = "host=127.0.0.1 port=5433 user=postgres dbname=gdbpool_test"
+
 
 class gDBPoolTests( unittest.TestCase ):
 
     def setUp( self ):
-        dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test"
-        dsn_read = "host=127.0.0.1 port=5433 user=postgres dbname=gdbpool_test"
-        self.ipool = DBInteractionPool( dsn, pool_size = 16, do_log = True )
-        # self.ipool_read = DBInteractionPool( dsn_read, pool_size = 16, do_log = True )
+        print "\n================================================================================\nRunning: %s\n================================================================================" % ( self._testMethodName )
+        self.ipool = DBInteractionPool( dsn, pool_size = 150, do_log = True )
 
     def tearDown( self ):
-        del( self.ipool )
-        # del( self.ipool_read )
+        self.ipool.__del__()
 
     def test_connect_nonexisting_host_port( self ):
         with self.assertRaises( PoolConnectionException ):
@@ -48,15 +51,14 @@ class gDBPoolTests( unittest.TestCase ):
             dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test_not_here"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
-    def test_connect_pool_size_too_big( self ):
+    def _test_connect_pool_size_too_big( self ):
         pass
 
     def test_invalid_query( self ):
-        """ Test running an invalid SQL interactions on the DBInteractionPool
-        """
+        """Test running an invalid SQL interactions on the DBInteractionPool"""
 
         sql = """
-        SELECT val1, count(id) FROM test_values WHERE val2 %s GROUP BY val1 order by val1;
+        ESLECT val1, count(id) FROM test_values GROUP BY val1 order by val1;
         """
 
         with self.assertRaises( DBInteractionException ):
@@ -64,9 +66,10 @@ class gDBPoolTests( unittest.TestCase ):
             print res.get()
 
     def test_select_ip_query( self ):
-        """ Test running a bunch of random queries as SQL interactions on the
-            DBInteractionPool
-            """
+        """
+        Test running a bunch of random queries as SQL interactions on the
+        DBInteractionPool
+        """
 
         sql1 = """
         SELECT val1, count(id) FROM test_values WHERE val2 = %s GROUP BY val1 order by val1;
@@ -117,10 +120,8 @@ class gDBPoolTests( unittest.TestCase ):
             curs.close()
             return res
 
-        logger.info( ' *** Start Interaction...' )
-        res = self.ipool.run( interaction )
-        res.get()
-        # logger.info( res.get() )
+        res = self.ipool.run( interaction ).get()
+        # logger.info( res )
 
 
     def test_select_ip_interactions( self ):
@@ -135,14 +136,22 @@ class gDBPoolTests( unittest.TestCase ):
             return res
 
         def print_res( res ):
-            logger.info( "+++ " + repr( res.get().get() ) )
+            logger.info( "?" )
+            while 1:
+                try:
+                    r = res.get().get_nowait()
+                    logger.info( r )
+                    break
+                except gevent.Timeout:
+                    gevent.sleep( 0.01 )
+
 
         greenlets = []
         for i in xrange( 5 ):
             greenlets.append( gevent.spawn( self.ipool.run, interaction ) )
             greenlets[ i ].link( print_res )
         gevent.joinall( greenlets, timeout = 10, raise_error = True )
-
+        gevent.sleep( 1 )
 
     def test_listen_on( self ):
         def run_insert( wait ):
@@ -176,26 +185,24 @@ class gDBPoolTests( unittest.TestCase ):
             rq = Queue( maxsize = None )
             stop_event = gevent.event.Event()
             gevent.spawn( self.ipool.listen_on, result_queue = rq, channel_name = 'notify_test_values', cancel_event = stop_event )
-            print "#START"
             import time
             while 1:
                 st = time.time()
-                if runtime > 4.0:
-                    print "#RT OVER STOP"
+                if runtime > 5.0:
                     break
                 try:
                     notify = rq.get_nowait()
-                    print notify
+                    print "NOTIFY", notify
                 except QueueEmptyException:
-                    gevent.sleep( 0.01 )
+                    gevent.sleep( 0.001 )
 
                 tt = time.time() - st
                 runtime += tt
 
-            print "#STOP"
             stop_event.set()
+            gevent.sleep( 1 )
 
-        for i in xrange( 10 ):
+        for i in xrange( 100 ):
             gevent.spawn( listen )
 
         greenlets = []
@@ -203,7 +210,7 @@ class gDBPoolTests( unittest.TestCase ):
             greenlets.append( gevent.spawn( run_insert, i ) )
             greenlets.append( gevent.spawn( run_update, i ) )
         gevent.joinall( greenlets )
-
+        gevent.sleep( 1 )
 
 
 test_suite = unittest.TestLoader().loadTestsFromTestCase( gDBPoolTests )
