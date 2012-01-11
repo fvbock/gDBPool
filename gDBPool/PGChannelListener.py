@@ -9,7 +9,7 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 import gevent
@@ -19,7 +19,7 @@ import psycopg2
 
 from psyco_ge import make_psycopg_green; make_psycopg_green()
 from gevent.select import select
-
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 class PGChannelListenerException( Exception ):
     pass
@@ -51,7 +51,8 @@ class PGChannelListener( object ):
             cls._instances[ channel_name ] = object.__new__( cls )
             cls._instances[ channel_name ].subscribers = {}
             cls._instances[ channel_name ].pool = pool
-            cls._instances[ channel_name ].conn = pool.get( auto_commit = True )
+            cls._instances[ channel_name ].conn = pool.get( iso_level = ISOLATION_LEVEL_AUTOCOMMIT )
+            cls._instances[ channel_name ].cur = None
             cls._instances[ channel_name ].channel_name = channel_name
             gevent.spawn( cls._instances[ channel_name ].listen )
 
@@ -64,35 +65,40 @@ class PGChannelListener( object ):
         pass
 
     def __del__( self ):
-        # conn teardown etc.
+        print "** __del__", self.channel_name
         del PGChannelListener._instances[ self.channel_name ]
 
     def unregister_queue( self, q_id ):
+        if self.stop_event.is_set():
+            return
         del self.subscribers[ q_id ]
         if len( self.subscribers ) == 0:
             self.stop_event.set()
+            self.cur.close()
             self.pool.put( self.conn )
 
     def listen( self, unmarshaller = pipe_colon_unmarshall ):
-        """ Subscriber to the channel and send notification payloads to the
-            results Queue.
+        """
+        Subscriber to the channel and send notification payloads to the
+        results Queue.
+        """
 
-            """
         self.stop_event = stop_event = gevent.event.Event()
-        cur = self.conn.cursor()
-        cur.execute( "LISTEN %s;" % ( self.channel_name, ) )
+        self.cur = self.conn.cursor()
+        self.cur.execute( "LISTEN %s;" % ( self.channel_name, ) )
         while 1:
             if self.stop_event.is_set():
-                break
-            # try:
+                return
             if select( [ self.conn ], [], [] ) == ( [], [], [] ):
                 print "LISTEN timeout."
             else:
+                if self.stop_event.is_set():
+                    return
                 self.conn.poll()
                 while self.conn.notifies:
+                    if self.stop_event.is_set():
+                        return
                     notify = self.conn.notifies.pop()
                     payload_data = unmarshaller( notify.payload )
                     for q_id in self.subscribers.iterkeys():
                             self.subscribers[ q_id ].put( payload_data )
-            # except psycopg2.InterfaceError, e:
-            #     pass
