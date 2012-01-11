@@ -36,7 +36,7 @@ class gDBPoolTests( unittest.TestCase ):
 
     def setUp( self ):
         print "\n================================================================================\nRunning: %s\n================================================================================" % ( self._testMethodName )
-        self.ipool = DBInteractionPool( dsn, pool_size = 150, do_log = True )
+        self.ipool = DBInteractionPool( dsn, pool_size = 16, do_log = True )
 
     def tearDown( self ):
         self.ipool.__del__()
@@ -202,7 +202,7 @@ class gDBPoolTests( unittest.TestCase ):
             stop_event.set()
             gevent.sleep( 1 )
 
-        for i in xrange( 100 ):
+        for i in xrange( 5 ):
             gevent.spawn( listen )
 
         greenlets = []
