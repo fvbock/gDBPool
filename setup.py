@@ -1,13 +1,13 @@
 from distutils.core import setup
 
-VERSION = (0, 1, 1, 0)
+VERSION = (0, 1, 2, 0)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
 
 setup(
     name = 'gDBPool',
-    version = '0.1.1',
+    version = '0.1.2',
     author = 'Florian von Bock',
     author_email = 'f@vonbock.com',
     url = 'https://github.com/fvbock/gDBPool',
