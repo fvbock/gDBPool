@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2011 Florian von Bock (f at vonbock dot info)
+# Copyright 2011-2012 Florian von Bock (f at vonbock dot info)
 #
 # gDBPool - db connection pooling for gevent
 
@@ -30,6 +30,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, ISOLATION_LEVEL_READ
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODE )
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODEARRAY )
 from psycopg2 import DatabaseError, InterfaceError
+from inspect import getargspec
 
 # TODO: make this an option...
 # DEC2FLOAT = psycopg2.extensions.new_type(
@@ -99,21 +100,39 @@ class DBInteractionPool( object ):
         return self.conn_pools[ self.default_pool ]
 
     def run( self, interaction = None, interaction_args = None, get_result = True,
-             is_write = True, pool = None, dry_run = False, *args, **kwargs ):
+             is_write = True, pool = None, conn = None, cursor = None, partial_txn = False,
+             dry_run = False, *args, **kwargs ):
         async_result = AsyncResult()
         if is_write:
             use_pool = self.default_write_pool if pool is None else pool
         else:
             use_pool = self.default_read_pool if pool is None else pool
 
+        if not conn:
+            conn = self.conn_pools[ use_pool ].get()
+
         if isinstance( interaction, FunctionType ) or isinstance( interaction, MethodType ):
-            def wrapped_transaction_f( async_res, interaction, *args ):
+            def wrapped_transaction_f( async_res, interaction, conn = None,
+                                       curs = None, *args ):
                 try:
-                    conn = self.conn_pools[ use_pool ].get()
+                    if not conn:
+                        conn = self.conn_pools[ use_pool ].get()
                     kwargs[ 'conn' ] = conn
+                    print getargspec( interaction )[ 0 ]
+                    if curs:
+                        kwargs[ 'curs' ] = curs
+                    elif 'curs' in getargspec( interaction )[ 0 ]:
+                        print "we do need a cursor!"
+                        kwargs[ 'curs' ] = kwargs[ 'conn' ].cursor()
                     res = interaction( *args, **kwargs )
-                    # self.conn_pools[ use_pool ].put( conn )
-                    async_res.set( res )
+                    if not partial_txn:
+                        async_res.set( res )
+                        if curs:
+                            curs.close()
+                    else:
+                        async_res.set( { 'result': res,
+                                         'connection': conn,
+                                         'cursor': kwargs[ 'curs' ] } )
                 except DatabaseError, e:
                     if self.do_log:
                         self.logger.info( "exception: %s", ( e, ) )
@@ -123,46 +142,55 @@ class DBInteractionPool( object ):
                         self.logger.info( "exception: %s", ( e, ) )
                     async_result.set_exception( DBInteractionException( e ) )
                 finally:
-                    if conn:
+                    if conn and not partial_txn:
                         self.conn_pools[ use_pool ].put( conn )
 
-            gevent.spawn( wrapped_transaction_f, async_result, interaction, *args )
+            gevent.spawn( wrapped_transaction_f, async_result, interaction,
+                          conn = conn, curs = cursor, *args )
             return async_result
 
         elif isinstance( interaction, StringType ):
-            def transaction_f( async_res, sql, *args ):
+            def transaction_f( async_res, sql, conn = None, curs = None,
+                               *args ):
                 try:
-                    conn = self.conn_pools[ use_pool ].get()
-                    cur = conn.cursor()
+                    if not conn:
+                        conn = self.conn_pools[ use_pool ].get()
+                    if not curs:
+                        curs = conn.cursor()
                     if interaction_args is not None:
-                        cur.execute( sql, interaction_args )
+                        curs.execute( sql, interaction_args )
                     else:
-                        cur.execute( sql )
+                        curs.execute( sql )
                     if get_result:
-                        res = cur.fetchall()
+                        res = curs.fetchall()
                     else:
                         res = True
-                    if is_write:
+                    if is_write and partial_txn:
                         conn.commit()
-                    cur.close()
-                    # self.conn_pools[ use_pool ].put( conn )
-                    async_res.set( res )
+                    if not partial_txn:
+                        curs.close()
+                        async_res.set( res )
+                    else:
+                        async_res.set( { 'result': res,
+                                         'connection': conn,
+                                         'cursor': curs } )
                 except DatabaseError, e:
                     if self.do_log:
                         self.logger.info( "exception: %s", ( e, ) )
                     async_result.set_exception( DBInteractionException( e ) )
                 except Exception, e:
                     traceback.print_exc( file = sys.stdout )
-                    if is_write:
+                    if is_write and partial_txn:
                         conn.rollback()
                     if self.do_log:
                         self.logger.info( "exception: %s", ( e, ) )
                     async_result.set_exception( DBInteractionException( e ) )
                 finally:
-                    if conn:
+                    if conn and partial_txn:
                         self.conn_pools[ use_pool ].put( conn )
 
-            gevent.spawn( transaction_f, async_result, interaction, *args )
+            gevent.spawn( transaction_f, async_result, interaction,
+                          conn = conn, curs = cursor, *args )
             return async_result
         else:
             raise DBInteractionException( "%s cannot be run. run() only accepts FunctionTypes, MethodType, and StringTypes" % interacetion )

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2011 Florian von Bock (f at vonbock dot info)
+# Copyright 2011-2012 Florian von Bock (f at vonbock dot info)
 #
 # gDBPool - Tests
 
@@ -51,7 +51,7 @@ class gDBPoolTests( unittest.TestCase ):
             dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test_not_here"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
-    def _test_connect_pool_size_too_big( self ):
+    def test_connect_pool_size_too_big( self ):
         pass
 
     def test_invalid_query( self ):
@@ -211,6 +211,46 @@ class gDBPoolTests( unittest.TestCase ):
             greenlets.append( gevent.spawn( run_update, i ) )
         gevent.joinall( greenlets )
         gevent.sleep( 1 )
+
+
+    def test_partial_run( self ):
+        def interaction_part1( conn, curs ):
+            # curs = conn.cursor()
+            sql = """
+            SELECT * FROM test_values WHERE id = 20000 FOR UPDATE;
+            """
+            curs.execute( sql )
+            res = curs.fetchone()
+            return res
+
+        # setting commit=false i want to get back not only the result, but also
+        # the connection and cursor (that might hold any locks) as well
+        txn_part1 = self.ipool.run( interaction_part1, partial_txn = True ).get()
+
+        print "result from partial txn 1:", txn_part1
+        data = txn_part1[ 'result' ]
+        conn = txn_part1[ 'connection' ]
+        curs = txn_part1[ 'cursor' ]
+        #TODO: do this inside the test - not manually
+        print "try running:\nUPDATE test_values SET val2 = val2 + 100 WHERE id = %s;\nand check that the result will be %s. the current value for val2 is %s" % ( data[ 'id'], data[ 'val2' ] + 200, data[ 'val2'] )
+        gevent.sleep( 10 )
+
+        def interaction_part2( conn, curs, pk, val2 ):
+            try:
+                sql = """
+                UPDATE test_values SET val2 = %s WHERE id = %s;
+                """
+                curs.execute( sql, [ val2, pk ] )
+                res = curs.fetchall()
+                conn.commit()
+            except Exception, e:
+                res = e
+                conn.rollback()
+
+            return res
+
+        txn_part2 = self.ipool.run( interaction_part2, conn = conn, cursor = curs, pk = data[ 'id'], val2 = data[ 'val2'] + 100 ).get()
+        print "result from partial txn 2:", txn_part2
 
 
 test_suite = unittest.TestLoader().loadTestsFromTestCase( gDBPoolTests )
