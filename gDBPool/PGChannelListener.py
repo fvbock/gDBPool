@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2011 Florian von Bock (f at vonbock dot info)
+# Copyright 2011-2012 Florian von Bock (f at vonbock dot info)
 #
 # gDBPool - db connection pooling for gevent
 #
