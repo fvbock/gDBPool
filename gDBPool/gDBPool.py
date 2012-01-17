@@ -165,7 +165,7 @@ class DBInteractionPool( object ):
                         res = curs.fetchall()
                     else:
                         res = True
-                    if is_write and partial_txn:
+                    if is_write and not partial_txn:
                         conn.commit()
                     if not partial_txn:
                         curs.close()
@@ -180,13 +180,13 @@ class DBInteractionPool( object ):
                     async_result.set_exception( DBInteractionException( e ) )
                 except Exception, e:
                     traceback.print_exc( file = sys.stdout )
-                    if is_write and partial_txn:
-                        conn.rollback()
+                    # if is_write and partial_txn: # ??
+                    conn.rollback()
                     if self.do_log:
                         self.logger.info( "exception: %s", ( e, ) )
                     async_result.set_exception( DBInteractionException( e ) )
                 finally:
-                    if conn and partial_txn:
+                    if conn and not partial_txn:
                         self.conn_pools[ use_pool ].put( conn )
 
             gevent.spawn( transaction_f, async_result, interaction,
