@@ -125,7 +125,7 @@ class DBInteractionPool( object ):
                     res = interaction( *args, **kwargs )
                     if not partial_txn:
                         async_res.set( res )
-                        if cursor:
+                        if cursor and not cursor.closed:
                             cursor.close()
                     else:
                         async_res.set( { 'result': res,
