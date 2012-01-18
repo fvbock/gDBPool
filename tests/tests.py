@@ -214,13 +214,13 @@ class gDBPoolTests( unittest.TestCase ):
 
 
     def test_partial_run( self ):
-        def interaction_part1( conn, curs ):
-            # curs = conn.cursor()
+        def interaction_part1( conn, cursor ):
+            # cursor = conn.cursor()
             sql = """
             SELECT * FROM test_values WHERE id = 20000 FOR UPDATE;
             """
-            curs.execute( sql )
-            res = curs.fetchone()
+            cursor.execute( sql )
+            res = cursor.fetchone()
             return res
 
         # setting commit=false i want to get back not only the result, but also
@@ -230,18 +230,18 @@ class gDBPoolTests( unittest.TestCase ):
         print "result from partial txn 1:", txn_part1
         data = txn_part1[ 'result' ]
         conn = txn_part1[ 'connection' ]
-        curs = txn_part1[ 'cursor' ]
+        cursor = txn_part1[ 'cursor' ]
         #TODO: do this inside the test - not manually
         print "try running:\nUPDATE test_values SET val2 = val2 + 100 WHERE id = %s;\nand check that the result will be %s. the current value for val2 is %s" % ( data[ 'id'], data[ 'val2' ] + 200, data[ 'val2'] )
-        gevent.sleep( 10 )
+        gevent.sleep( 5 )
 
-        def interaction_part2( conn, curs, pk, val2 ):
+        def interaction_part2( conn, cursor, pk, val2 ):
             try:
                 sql = """
                 UPDATE test_values SET val2 = %s WHERE id = %s;
                 """
-                curs.execute( sql, [ val2, pk ] )
-                res = curs.fetchall()
+                cursor.execute( sql, [ val2, pk ] )
+                res = cursor.fetchall()
                 conn.commit()
             except Exception, e:
                 res = e
@@ -249,7 +249,7 @@ class gDBPoolTests( unittest.TestCase ):
 
             return res
 
-        txn_part2 = self.ipool.run( interaction_part2, conn = conn, cursor = curs, pk = data[ 'id'], val2 = data[ 'val2'] + 100 ).get()
+        txn_part2 = self.ipool.run( interaction_part2, conn = conn, cursor = cursor, pk = data[ 'id'], val2 = data[ 'val2'] + 100 ).get()
         print "result from partial txn 2:", txn_part2
 
 
