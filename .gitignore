@@ -3,4 +3,5 @@
 .ropeproject
 dev/*
 gDBPool/tests.py
+gdbpool/tests.py
 docs/build/*
