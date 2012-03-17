@@ -14,7 +14,7 @@ setup(
     license = 'MIT License',
     packages = ['gdbpool',],
     description = 'Database (PostgreSQL) pooling and interaction/query runner for gevent.',
-    long_description = open('README.md').read(),
+    long_description = open('README.rst').read(),
     classifiers = [
         "Topic :: Database",
         "Development Status :: 4 - Beta",
