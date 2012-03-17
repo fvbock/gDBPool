@@ -28,10 +28,11 @@ class PGChannelListenerException( Exception ):
 
 def pipe_colon_unmarshall( payload_string ):
     """
-    Convert a pipe seperated string of <key:value> pairs as a dict
+    Convert a pipe seperated string of <key:value> pairs to a dict
 
     :param string payload_string:
-    :returns: dict -- unmarshalled NOTIFY data
+    :rtype: dict
+    :returns: unmarshalled NOTIFY data
     """
 
     payload_data = {}
@@ -48,8 +49,8 @@ class PGChannelListener( object ):
     """
     A Listener for Postgres LISTEN/NOTIFY channels using gevent.
 
-    For each channel there will be one `:class:PGChannelListener` instance that fans
-    notifications out to the subscribed `:class:Queue`}
+    For each channel there will be one :class:`PGChannelListener` instance that fans
+    notifications out to the subscribed :class:`Queue`
     """
 
     def __new__(  cls, q, pool, channel_name, *args, **kwargs ):
@@ -80,7 +81,8 @@ class PGChannelListener( object ):
         :param gDBPool.DBConnectionPool pool: Connection pool to get a connection from and execute ``LISTEN <channel_name>;`` on if no other instance listens on that channel already. In the latter case the q is just being subscribed to the channel.
         :param string channel_name: channel to listen on. (``LISTEN <channel_name>;``)
 
-        :returns: -- PGChannelListener instance
+        :rtype: PGChannelListener
+        :returns: The PGChannelListener instance handling the channel
         """
 
         pass
@@ -108,7 +110,7 @@ class PGChannelListener( object ):
 
     def listen( self, unmarshaller = pipe_colon_unmarshall ):
         """
-        Subscriber to the channel and send notification payloads to the
+        Subscribe to the channel and send notification payloads to the
         results Queue.
 
         :param function unmarshaller: Function to pass the `notify.payload` string into for unmarshalling into python object (ie. dict) data

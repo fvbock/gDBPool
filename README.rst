@@ -1,6 +1,6 @@
-##############################################
+==============================================
 gDBPool: Postgres database pooling with gevent
-##############################################
+==============================================
 
 gDBPool is a library to do async communication to `PostgreSQL
 <http://postgresql.org>`_ using `psycopg2 <http://initd.org/psycopg/>`_ and gevent.
@@ -11,18 +11,15 @@ Please refer to the `full gDBPool documenation<http://vonbock.info/software/gdbp
 
 .. _requirements:
 
-############
 Requirements
-############
+------------
 
-^^^^^^^
 General
 ^^^^^^^
 
 * Python 2.7
 * Postgres 9.0.x+
 
-^^^^^^^
 Via Pip
 ^^^^^^^
 
@@ -30,9 +27,8 @@ Via Pip
 * psycopg 2.4.2+
 
 
-############
 Installation
-############
+------------
 
 install the required packages ::
 
@@ -44,18 +40,6 @@ then install the package itself ::
 
 
 
-###########
-Quick intro
-###########
-
-TODO: short example
-
-
-#####
-Usage
-#####
-
-:doc:`classes/index`: Classes.
 
 
 

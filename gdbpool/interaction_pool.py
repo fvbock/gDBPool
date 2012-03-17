@@ -188,16 +188,19 @@ class DBInteractionPool( object ):
                         conn = self.conn_pools[ use_pool ].get()
                     if not cursor:
                         cursor = conn.cursor()
-                    if interaction_args is not None:
-                        cursor.execute( sql, interaction_args )
+                    if not dry_run:
+                        if interaction_args is not None:
+                            cursor.execute( sql, interaction_args )
+                        else:
+                            cursor.execute( sql )
+                        if get_result:
+                            res = cursor.fetchall()
+                        else:
+                            res = True
+                        if is_write and not partial_txn:
+                            conn.commit()
                     else:
-                        cursor.execute( sql )
-                    if get_result:
-                        res = cursor.fetchall()
-                    else:
-                        res = True
-                    if is_write and not partial_txn:
-                        conn.commit()
+                        res = cursor.mogrify( sql, interaction_args )
                     if not partial_txn:
                         cursor.close()
                         async_res.set( res )
@@ -244,6 +247,7 @@ class DBInteractionPool( object ):
             def start_listener():
                 self.active_listeners[ channel_name ] = PGChannelListener( result_queue, self.conn_pools[ use_pool ], channel_name )
 
+            # do we need a listen loop for all PGChannelListeners? maybe one is enough...
             def listen( result_queue, cancel_event ):
                 while 1:
                     if cancel_event.is_set():

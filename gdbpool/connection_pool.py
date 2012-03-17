@@ -82,6 +82,19 @@ class DBConnectionPool( object ):
         except PoolConnectionException, e:
             raise e
 
+    def resize( self, new_size ):
+        """
+        Resize the pool (nr. of connections on the pool)
+
+        :param int new_size: nr ob connections the pool should be resized to
+        """
+        while self.qsize != new_size:
+            if self.qsize < new_size:
+                self.create_connection()
+            else:
+                conn = self.pool.get()
+                conn.close()
+
     def get( self, timeout = None, iso_level = ISOLATION_LEVEL_READ_COMMITTED ):
         """
         Get a connection from the pool

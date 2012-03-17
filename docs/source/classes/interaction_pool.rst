@@ -14,7 +14,7 @@ DBInteractionPool provides two main methods for interaction:
 
 
 
-Object Documenation
+Class Documenation
 -------------------
 
 .. autoclass:: gdbpool.interaction_pool.DBInteractionPool
