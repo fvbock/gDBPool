@@ -66,9 +66,6 @@ We have an interaction_pool instance and can start running queries intaractions 
 
 .. sourcecode:: ipython
 
-    In [6]: ipool.run( "SELECT * FROM test_values WHERE id = %s;", [ 123 ] ).get()
-    Out[6]: [{'id': 123, 'val1': 7, 'val2': 9}]
-
     In [7]: async_result = ipool.run( "SELECT * FROM test_values WHERE id = %s;", [ 123 ] )
 
     In [8]: async_result
@@ -141,7 +138,6 @@ To listen on a postgres channel for events
     In [2]: from gevent import monkey; monkey.patch_all()
 
     In [3]: from gevent.queue import Queue
-    The history saving thread hit an unexpected error (NotImplementedError('gevent is only usable from a single thread',)).History will not be written to the database.
 
     In [4]: from gevent.queue import Empty as QueueEmptyException
 
