@@ -6,7 +6,7 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 
 import gevent

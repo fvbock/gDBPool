@@ -8,7 +8,7 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 
 import sys, traceback
@@ -17,7 +17,6 @@ import sys, traceback
 class DBPoolException( Exception ):
     def __init__( self, message ):
         Exception.__init__( self, message )
-        # traceback.print_exc( file = sys.stdout )
 
 class DBInteractionException( DBPoolException ):
     pass
