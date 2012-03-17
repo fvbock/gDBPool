@@ -6,17 +6,17 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 
 import gevent
 from gevent import monkey; monkey.patch_all()
+from psyco_ge import make_psycopg_green; make_psycopg_green()
+import sys
+assert 'gdbpool.psyco_ge' in sys.modules.keys()
 
 import psycopg2
-import sys, traceback
-
-from psyco_ge import make_psycopg_green; make_psycopg_green()
-assert 'gdbpool.psyco_ge' in sys.modules.keys()
+import traceback
 
 from gevent.queue import Queue, Empty as QueueEmptyException
 from gevent.event import AsyncResult
@@ -63,6 +63,7 @@ class DBInteractionPool( object ):
         self.default_write_pool = None
         self.default_read_pool = None
         self.default_pool = None
+        self.active_listeners = {}
         self.add_pool( dsn = dsn, pool_name = 'default', pool_size = pool_size,
                        default_write_pool = True, default_read_pool = True,
                        db_module = self.db_module )
@@ -127,9 +128,10 @@ class DBInteractionPool( object ):
         :param cursor cursor: Pass in a `Cursor` instead of getting one from the `Connection` (ie. for locks in transactions that span several interactions.  Use `partial_txn = True` to retrieve the Cursor and then pass it into the next interaction run.)
         :param bool partial_txn: Return connection and cursor after executing the interaction (ie. for locks in transactions that span several interactions)
         :param bool dry_run: Run the query with `mogrify` instead of `execute` and output the query that would have run. (Only applies to query interactions)
-        :param list args: args
-        :param dict kwargs: kwargs
+        :param list args: positional args for the interaction
+        :param dict kwargs: kwargs for the interaction
 
+        :rtype: gevent.AsyncResult
         :returns: -- a :class:`gevent.AsyncResult` that will hold the result of the interaction once it finished. When `partial_txn = True` it will return a dict that will hold the result, the connection, and the cursor that ran the transaction. (use for locking with SELECT FOR UPDATE)
         """
 
@@ -225,7 +227,7 @@ class DBInteractionPool( object ):
             raise DBInteractionException( "%s cannot be run. run() only accepts FunctionTypes, MethodType, and StringTypes" % interacetion )
 
     def listen_on( self, result_queue = None, channel_name = None, pool = None,
-                   cancel_event = None ):
+                   cancel_event = None, sleep_cycle = 0.1 ):
         """
         Listen for asynchronous events on a named Channel and pass them to the result_queue
 
@@ -239,23 +241,26 @@ class DBInteractionPool( object ):
             raise DBInteractionException( "This feature requires PostgreSQL 9.x." )
         use_pool = self.default_write_pool if pool is None else pool
         try:
-            q = Queue( maxsize = None )
-            listener = PGChannelListener( q, self.conn_pools[ use_pool ], channel_name )
-            while 1:
-                if cancel_event.is_set():
-                    break
-                try:
-                    result_queue.put( q.get_nowait() )
-                except QueueEmptyException:
-                    gevent.sleep( 0.001 )
+            def start_listener():
+                self.active_listeners[ channel_name ] = PGChannelListener( result_queue, self.conn_pools[ use_pool ], channel_name )
+
+            def listen( result_queue, cancel_event ):
+                while 1:
+                    if cancel_event.is_set():
+                        self.active_listeners[ channel_name ].unregister_queue( id( result_queue ) )
+                        if self.do_log:
+                            self.logger.info( "stopped listening on: %s", ( channel_name, ) )
+                        break
+                    gevent.sleep( sleep_cycle )
+
+            listener_jobs = [ gevent.spawn( start_listener ),
+                              gevent.spawn( listen, result_queue, cancel_event ) ]
+            gevent.joinall( listener_jobs )
         except Exception, e:
             print "# FRAKK", e
             if self.do_log:
                 self.logger.info( e )
 
-        listener.unregister_queue( id( q ) )
-        if self.do_log:
-            self.logger.info( "stopped listening on: %s", ( channel_name, ) )
 
 
 # TODO: make this an option...?
