@@ -9,17 +9,18 @@
 
 __author__ = "Florian von Bock"
 __email__ = "f at vonbock dot info"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 
 import gevent
 from gevent import monkey; monkey.patch_all()
+from psyco_ge import make_psycopg_green; make_psycopg_green()
 
 import psycopg2
 
-from psyco_ge import make_psycopg_green; make_psycopg_green()
 from gevent.select import select
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
 
 class PGChannelListenerException( Exception ):
     pass
@@ -54,6 +55,7 @@ class PGChannelListener( object ):
     def __new__(  cls, q, pool, channel_name, *args, **kwargs ):
         if not hasattr( cls, '_instances' ):
             cls._instances = {}
+        spawn = False
         if not cls._instances.has_key( channel_name ):
             cls._instances[ channel_name ] = object.__new__( cls )
             cls._instances[ channel_name ].subscribers = {}
@@ -61,11 +63,13 @@ class PGChannelListener( object ):
             cls._instances[ channel_name ].conn = pool.get( iso_level = ISOLATION_LEVEL_AUTOCOMMIT )
             cls._instances[ channel_name ].cur = None
             cls._instances[ channel_name ].channel_name = channel_name
-            gevent.spawn( cls._instances[ channel_name ].listen )
+            spawn = True
 
         # hai hai... using id for this kind of stuff is sort of dangerous.
         # will come up with something less pointing gun at foot(TM). later. (TM).
         cls._instances[ channel_name ].subscribers[ id( q ) ] = q
+        if spawn:
+            gevent.spawn( cls._instances[ channel_name ].listen ).join()
         return cls._instances[ channel_name ]
 
     def __init__( self, q, pool, channel_name ):
@@ -116,6 +120,9 @@ class PGChannelListener( object ):
         while 1:
             if self.stop_event.is_set():
                 return
+            # TODO: test select with timeout and try/except
+            # maybe try to listen on all channels with just one connection with short timeouts on the select
+            # and then cycle through...
             if select( [ self.conn ], [], [] ) == ( [], [], [] ):
                 print "LISTEN timeout."
             else:
@@ -128,4 +135,5 @@ class PGChannelListener( object ):
                     notify = self.conn.notifies.pop()
                     payload_data = unmarshaller( notify.payload )
                     for q_id in self.subscribers.iterkeys():
-                            self.subscribers[ q_id ].put( payload_data )
+                        self.subscribers[ q_id ].put( payload_data )
+
