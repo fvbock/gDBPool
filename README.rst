@@ -7,6 +7,11 @@ gDBPool is a library to do async communication to `PostgreSQL
 
 Please refer to the `full gDBPool documenation <http://vonbock.info/software/gdbpool/documentation>`_ for more information.
 
+Any help testing/breaking things and then leaving an issue on github is greatly appreciated!
+
+If you have any questions, ping me on twitter `@fvbock <https://twitter.com/fvbock>`_.
+
+
 .. end-summary
 
 .. _requirements:
@@ -37,9 +42,6 @@ install the required packages ::
 then install the package itself ::
 
     $ sudo python setup.py install
-
-
-
 
 
 
