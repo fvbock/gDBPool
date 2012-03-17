@@ -22,8 +22,11 @@ import logging
 from gevent.select import select
 from gevent.queue import Queue
 from gevent.queue import Empty as QueueEmptyException
-from gDBPool.gDBPoolError import DBInteractionException, DBPoolConnectionException, PoolConnectionException, StreamEndException
-from gDBPool.gDBPool import DBInteractionPool, DBConnectionPool, PoolConnection
+
+from gdbpool.gdbpool_error import DBInteractionException, DBPoolConnectionException, PoolConnectionException, StreamEndException
+from gdbpool.interaction_pool import DBInteractionPool
+from gdbpool.connection_pool import DBConnectionPool
+from gdbpool.pool_connection import PoolConnection
 
 logging.basicConfig( level = logging.INFO, format = "%(asctime)s %(message)s" )
 logger = logging.getLogger()
@@ -42,16 +45,16 @@ class gDBPoolTests( unittest.TestCase ):
         self.ipool.__del__()
 
     def test_connect_nonexisting_host_port( self ):
-        with self.assertRaises( PoolConnectionException ):
+        with self.assertRaises( DBPoolConnectionException ):
             dsn = "host=127.0.0.1 port=6432 user=postgres dbname=gdbpool_test"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
     def test_connect_nonexisting_db( self ):
-        with self.assertRaises( PoolConnectionException ):
+        with self.assertRaises( DBPoolConnectionException ):
             dsn = "host=127.0.0.1 port=5432 user=postgres dbname=gdbpool_test_not_here"
             fail_ipool = DBInteractionPool( dsn, pool_size = 1, do_log = False )
 
-    def test_connect_pool_size_too_big( self ):
+    def _test_connect_pool_size_too_big( self ):
         pass
 
     def test_invalid_query( self ):
