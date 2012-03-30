@@ -9,7 +9,7 @@ setup(
     name = 'gDBPool',
     version = '0.1.3',
     author = 'Florian von Bock',
-    author_email = 'f@vonbock.com',
+    author_email = 'f@vonbock.info',
     url = 'https://github.com/fvbock/gDBPool',
     license = 'MIT License',
     packages = ['gdbpool',],
