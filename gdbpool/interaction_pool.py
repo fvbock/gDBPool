@@ -141,9 +141,6 @@ class DBInteractionPool( object ):
         else:
             use_pool = self.default_read_pool if pool is None else pool
 
-        if not conn:
-            conn = self.conn_pools[ use_pool ].get()
-
         if isinstance( interaction, FunctionType ) or isinstance( interaction, MethodType ):
             def wrapped_transaction_f( async_res, interaction, conn = None,
                                        cursor = None, *args ):
