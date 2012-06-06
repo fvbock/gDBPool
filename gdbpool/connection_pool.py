@@ -54,6 +54,12 @@ class DBConnectionPool( object ):
         self.db_module = db_module
         self.pool_size = pool_size
         self.CONN_RECYCLE_AFTER = conn_lifetime if conn_lifetime is not None else 0
+        if self.CONN_RECYCLE_AFTER == 0:
+            msg = "Connection lifetime is set to unlimited, which means that they never get automatically recycled and could thus turn stale. This setting is discouraged."
+            if self.do_log:
+                self.logger.warn( msg )
+            else:
+                print msg
         self.pool = Queue( self.pool_size )
         __import__( db_module )
         self.connection_jobs = map( lambda x: gevent.spawn( self.create_connection ), xrange( self.pool_size ) )
@@ -67,6 +73,9 @@ class DBConnectionPool( object ):
             raise DBPoolConnectionException( "Could not get %s connections for the pool as requested. %s" % ( self.pool_size, e.message ) )
         except Exception, e:
             raise e
+        if self.CONN_RECYCLE_AFTER > 0:
+            gevent.spawn_later( float( self.CONN_RECYCLE_AFTER ) / 2, self.recycle_conn )
+
 
     def __del__( self ):
         while not self.pool.empty():
@@ -78,8 +87,11 @@ class DBConnectionPool( object ):
         Try to open a new connection to the database and put it on the pool
         """
         try:
-            self.pool.put( PoolConnection( self.db_module, self.dsn ) )
+            conn = PoolConnection( self.db_module, self.dsn )
+            self.pool.put( conn )
         except PoolConnectionException, e:
+            if self.do_log:
+                self.logger.error( "PoolConnectionException: {}".format( e ) )
             raise e
 
     def resize( self, new_size ):
@@ -132,17 +144,52 @@ class DBConnectionPool( object ):
                 except gevent.queue.Full, e:
                     raise PoolConnectionException( e )
             else:
-                if self.do_log:
-                    self.logger.info( "recycling conn." )
+                print "----"
+                gevent.spawn( self.recycle_conn )
+        else:
+            raise PoolConnectionException( "Passed object %s is not a PoolConnection." % ( conn, ) )
+
+    def recycle_conn( self ):
+        """
+        Recycle the old connections
+
+        :param conn: The :class:`PoolConnection` object to be put back onto the pool
+        """
+        if self.do_log:
+            self.logger.info( "recycling check." )
+
+        put_back = []
+        c_count = 0
+        while not self.pool.empty() and self.qsize > self.pool_size / 2:
+            print "+"
+            conn = self.pool.get()
+            print conn
+            print self.CONN_RECYCLE_AFTER, ( time() - conn.PoolConnection_initialized_at )
+            if self.CONN_RECYCLE_AFTER > 0 and ( time() - conn.PoolConnection_initialized_at > self.CONN_RECYCLE_AFTER ):
+                print "-"
                 try:
-                    conn.reset() # ?
                     conn.close()
                 except InterfaceError:
                     pass
+                except OperationalError:
+                    pass
                 del conn
-                gevent.spawn( self.create_connection ).join()
-        else:
-            raise PoolConnectionException( "Passed object %s is not a PoolConnection." % ( conn, ) )
+                c_count += 1
+                print "--"
+            else:
+                put_back.append( conn )
+
+        for conn in put_back:
+            self.pool.put( conn )
+
+        self.logger.info( "check done." )
+        get_conns = []
+        for n in xrange( c_count ):
+            get_conns.append( gevent.spawn( self.create_connection ) )
+        gevent.joinall( get_conns )
+        self.logger.info( "recycling done." )
+        if self.CONN_RECYCLE_AFTER > 0:
+            gevent.spawn_later( float( self.CONN_RECYCLE_AFTER ) / 2, self.recycle_conn )
 
     @property
     def qsize( self ):

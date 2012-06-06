@@ -61,5 +61,3 @@ class PoolConnection( object ):
         #elif self.PoolConnection_db_module_name == 'MySQLdb':
         #    args.append( MySQLdb.cursors.DictCursor if self.PoolConnection_cursor_type is None else self.PoolConnection_cursor_type )
         #    return self.PoolConnection_conn.cursor( *args, **kwargs )
-
-

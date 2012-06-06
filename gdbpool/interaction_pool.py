@@ -25,6 +25,7 @@ from psycopg2 import DatabaseError
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODE )
 psycopg2.extensions.register_type( psycopg2.extensions.UNICODEARRAY )
 from inspect import getargspec
+from contextlib import contextmanager
 
 from connection_pool import DBConnectionPool
 from channel_listener import PGChannelListener
@@ -44,11 +45,12 @@ class DBInteractionPool( object ):
         return cls._instance
 
     def __init__( self, dsn, pool_size = 10, pool_name = 'default',
-                  do_log = False ):
+                  conn_lifetime = 600, do_log = False ):
         """
         :param string dsn: DSN for the default `class:DBConnectionPool`
         :param int pool_size: Poolsize of the first/default `class:DBConnectionPool`
         :param string pool_name: Keyname for the first/default `class:DBConnectionPool`
+        :param int conn_lifetime: Number of seconds after which connections on default pool should be recycled
         :param bool do_log: Log to the console or not
         """
 
@@ -66,7 +68,7 @@ class DBInteractionPool( object ):
         self.active_listeners = {}
         self.add_pool( dsn = dsn, pool_name = 'default', pool_size = pool_size,
                        default_write_pool = True, default_read_pool = True,
-                       db_module = self.db_module )
+                       conn_lifetime = conn_lifetime, db_module = self.db_module )
 
     def __del__( self ):
         if self.do_log:
@@ -80,17 +82,19 @@ class DBInteractionPool( object ):
 
     def add_pool( self, dsn = None, pool_name = None, pool_size = 10,
                   default_write_pool = False, default_read_pool = False,
-                  default_pool = False, db_module = 'psycopg2' ):
+                  default_pool = False, conn_lifetime = 600,
+                  db_module = 'psycopg2' ):
         """
         Add a named `:class:DBConnectionPool`
 
-        :param string dsn: dsn
-        :param string pool_name: a name for the pool to identify it inside the DBInteractionPool
+        :param string dsn: DSN
+        :param string pool_name: A name for the pool to identify it inside the DBInteractionPool
         :param int pool_size: Number of connections the pool should have.
         :param bool default_write_pool: Should the added pool used as the default pool for write operations?
         :param bool default_read_pool: Should the added pool used as the default pool for read operations?
         :param bool default_pool: Should the added pool used as the default pool? (*must* be a write pool)
-        :param string db_module: name of the DB-API module to use
+        :param int conn_lifetime: Number of seconds after which connections on that pool should be recycled
+        :param string db_module: Name of the DB-API module to use
 
         .. note::
             db_module right now ONLY supports psycopg2 and the option most likely will be removed in the future
@@ -98,7 +102,9 @@ class DBInteractionPool( object ):
 
         if not self.conn_pools.has_key( pool_name ):
             self.conn_pools[ pool_name ] = DBConnectionPool( dsn, db_module = self.db_module,
-                                                             pool_size = pool_size, do_log = self.do_log )
+                                                             pool_size = pool_size,
+                                                             conn_lifetime = conn_lifetime,
+                                                             do_log = self.do_log )
             if default_write_pool:
                 self.default_write_pool = pool_name
                 if self.default_pool or self.default_pool is None:
@@ -141,10 +147,21 @@ class DBInteractionPool( object ):
         else:
             use_pool = self.default_read_pool if pool is None else pool
 
+        # TODO: add a context manager for the exception handling
+        # Traceback (most recent call last):
+        #   File "/srv/repo/gevendpoint/models/ModelBase.py", line 844, in get
+        #     res = dbi_pool.run( sql, _query_args, is_write = False ).get()
+        #   File "/usr/local/lib/python2.7/dist-packages/gevent/event.py", line 223, in get
+        #     raise self._exception
+        # DBInteractionException: SSL connection has been closed unexpectedly
+
+
         if isinstance( interaction, FunctionType ) or isinstance( interaction, MethodType ):
             def wrapped_transaction_f( async_res, interaction, conn = None,
                                        cursor = None, *args ):
-                try:
+
+                with self.run_txn( async_res, conn = conn, cursor = cursor,
+                                   pool_name = use_pool, partial_txn = partial_txn ):
                     if not conn:
                         conn = self.conn_pools[ use_pool ].get()
                     kwargs[ 'conn' ] = conn
@@ -161,17 +178,6 @@ class DBInteractionPool( object ):
                         async_res.set( { 'result': res,
                                          'connection': conn,
                                          'cursor': kwargs[ 'cursor' ] } )
-                except DatabaseError, e:
-                    if self.do_log:
-                        self.logger.info( "exception: %s", ( e, ) )
-                    async_result.set_exception( DBInteractionException( e ) )
-                except Exception, e:
-                    if self.do_log:
-                        self.logger.info( "exception: %s", ( e, ) )
-                    async_result.set_exception( DBInteractionException( e ) )
-                finally:
-                    if conn and not partial_txn:
-                        self.conn_pools[ use_pool ].put( conn )
 
             gevent.spawn( wrapped_transaction_f, async_result, interaction,
                           conn = conn, cursor = cursor, *args )
@@ -180,7 +186,9 @@ class DBInteractionPool( object ):
         elif isinstance( interaction, StringType ):
             def transaction_f( async_res, sql, conn = None, cursor = None,
                                *args ):
-                try:
+
+                with self.run_txn( async_res, conn = conn, cursor = cursor,
+                                   pool_name = use_pool, partial_txn = partial_txn  ):
                     if not conn:
                         conn = self.conn_pools[ use_pool ].get()
                     if not cursor:
@@ -205,26 +213,57 @@ class DBInteractionPool( object ):
                         async_res.set( { 'result': res,
                                          'connection': conn,
                                          'cursor': cursor} )
-                except DatabaseError, e:
-                    if self.do_log:
-                        self.logger.info( "exception: %s", ( e, ) )
-                    async_result.set_exception( DBInteractionException( e ) )
-                except Exception, e:
-                    traceback.print_exc( file = sys.stdout )
-                    # if is_write and partial_txn: # ??
-                    conn.rollback()
-                    if self.do_log:
-                        self.logger.info( "exception: %s", ( e, ) )
-                    async_result.set_exception( DBInteractionException( e ) )
-                finally:
-                    if conn and not partial_txn:
-                        self.conn_pools[ use_pool ].put( conn )
 
             gevent.spawn( transaction_f, async_result, interaction,
                           conn = conn, cursor = cursor, *args )
             return async_result
         else:
             raise DBInteractionException( "%s cannot be run. run() only accepts FunctionTypes, MethodType, and StringTypes" % interacetion )
+
+
+    @contextmanager
+    def run_txn( self, async_res, conn = None, cursor = None,
+                 pool_name = None, partial_txn = False ):
+        recycle_conn = False
+        try:
+            yield
+
+        except DatabaseError, e:
+            if self.do_log:
+                self.logger.error( "exception: %s", ( e, ) )
+                async_res.set_exception( DBInteractionException( e ) )
+        except InterfaceError:
+            traceback.print_exc( file = sys.stdout )
+            if self.do_log:
+                self.logger.error( "exception: %s", ( e, ) )
+            async_res.set_exception( DBInteractionException( e ) )
+            recycle_conn = True
+        except OperationalError:
+            traceback.print_exc( file = sys.stdout )
+            if self.do_log:
+                self.logger.error( "exception: %s", ( e, ) )
+            async_res.set_exception( DBInteractionException( e ) )
+            recycle_conn = True
+        except Exception, e:
+            traceback.print_exc( file = sys.stdout )
+            # if is_write and partial_txn: # ??
+            conn.rollback()
+            if self.do_log:
+                self.logger.error( "exception: %s", ( e, ) )
+            async_res.set_exception( DBInteractionException( e ) )
+        finally:
+            if conn and not partial_txn and not recycle_conn:
+                self.conn_pools[ pool_name ].put( conn )
+            elif conn and not recycle_conn:
+                # connection was bad, throw it away and create a new one
+                try:
+                    conn.close()
+                    del conn
+                except Exception:
+                    pass
+                finally:
+                    gevent.spawn( self.conn_pools[ pool_name ].create_connection )
+
 
     def listen_on( self, result_queue = None, channel_name = None, pool = None,
                    cancel_event = None, sleep_cycle = 0.1 ):
@@ -261,6 +300,9 @@ class DBInteractionPool( object ):
             print "# FRAKK", e
             if self.do_log:
                 self.logger.info( e )
+
+
+
 
 
 
