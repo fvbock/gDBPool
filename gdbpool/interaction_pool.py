@@ -64,7 +64,7 @@ class DBInteractionPool( object ):
         self.default_read_pool = None
         self.default_pool = None
         self.active_listeners = {}
-        self.add_pool( dsn = dsn, pool_name = 'default', pool_size = pool_size,
+        self.add_pool( dsn = dsn, pool_name = pool_name, pool_size = pool_size,
                        default_write_pool = True, default_read_pool = True,
                        db_module = self.db_module )
 
