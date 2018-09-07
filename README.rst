@@ -5,7 +5,7 @@ gDBPool: Postgres database pooling with gevent
 gDBPool is a library to do async communication to `PostgreSQL
 <http://postgresql.org>`_ using `psycopg2 <http://initd.org/psycopg/>`_ and gevent.
 
-Please refer to the `full gDBPool documenation <http://vonbock.info/software/gdbpool/documentation>`_ for more information.
+Please refer to the `full gDBPool documenation <https://vonbock.info/software/gdbpool/documentation/>`_ for more information.
 
 Any help testing/breaking things and then leaving an issue on github is greatly appreciated!
 
